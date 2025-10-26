@@ -13,11 +13,10 @@ from sklearn.impute import SimpleImputer
 
 # === Streamlit App Title ===
 st.title("🎓 Scholarship Eligibility Prediction")
-st.write("Enter your details below to check which scholarships you are eligible for.")
+st.write("Enter your details below to check which scholarships you are eligible for and directly visit their official websites.")
 
-# === STEP 1: Load Dataset Automatically ===
-DATA_PATH = r"Scholarship_dataset_final.csv"
-
+# === STEP 1: Load Dataset ===
+DATA_PATH = "Scholarship_dataset_final.csv"
 df = pd.read_csv(DATA_PATH)
 df["gate_score"] = pd.to_numeric(df["gate_score"], errors="coerce").fillna(0)
 
@@ -29,7 +28,7 @@ mlb = MultiLabelBinarizer()
 y = mlb.fit_transform(y_labels)
 joblib.dump(mlb, "label_binarizer.pkl")
 
-# === STEP 3: Pipelines for Preprocessing ===
+# === STEP 3: Preprocessing Pipelines ===
 categorical = ["gender", "state", "category", "institution_type", "program", "branch"]
 numeric = ["age", "family_income_annual_inr", "disability", "year", "final_year",
            "tenth_percent", "twelfth_percent", "ug_cgpa", "gate_score"]
@@ -53,10 +52,8 @@ preprocessor = ColumnTransformer(
 
 # === STEP 4: Model Training or Loading ===
 model_file = "scholarship_model.pkl"
-
 if os.path.exists(model_file):
     clf = joblib.load(model_file)
-    
 else:
     st.info("🚀 Training new model...")
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
@@ -68,9 +65,20 @@ else:
     ])
     clf.fit(X_train, y_train)
     joblib.dump(clf, model_file)
-    
 
-# === STEP 5: User Input Form ===
+# === STEP 5: Scholarship Links Dictionary ===
+scholarship_links = {
+    "Post-Matric Scholarship (SC/ST/OBC)": "https://scholarships.gov.in",
+    "State Post-Matric Scholarship": "https://scholarships.gov.in",
+    "GATE-based MTech Fellowship": "https://aicte-india.org/schemes/students-development-schemes/PG-Scholarship",
+    "NTPC Scholarship": "https://www.ntpc.co.in/en/careers/scholarships",
+    "AICTE Pragati Scholarship": "https://aicte-india.org/schemes/students-development-schemes/Pragati-Scheme",
+    "Central Sector Scholarship": "https://scholarships.gov.in",
+    "Siemens Scholarship Program": "https://www.siemens.co.in/en/scholarship",
+    "Tata Trusts Scholarship": "https://www.tatatrusts.org/our-work/education/scholarships"
+}
+
+# === STEP 6: User Input Form ===
 st.subheader("🧾 Enter Your Academic and Personal Details")
 
 with st.form("scholarship_form"):
@@ -98,7 +106,7 @@ with st.form("scholarship_form"):
 
     submitted = st.form_submit_button("Predict Eligible Scholarships")
 
-# === STEP 6: Prediction ===
+# === STEP 7: Prediction ===
 if submitted:
     sample = pd.DataFrame([{
         "age": age,
@@ -126,6 +134,10 @@ if submitted:
     st.subheader("🎯 Eligible Scholarships:")
     if scholarships:
         for s in scholarships:
-            st.markdown(f"- {s}")
+            link = scholarship_links.get(s)
+            if link:
+                st.markdown(f"- [{s}]({link})")
+            else:
+                st.markdown(f"- {s}")
     else:
         st.info("No matching scholarships found for the entered details.")
