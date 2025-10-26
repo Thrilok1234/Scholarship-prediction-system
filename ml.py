@@ -135,9 +135,11 @@ if submitted:
     if scholarships:
         for s in scholarships:
             link = scholarship_links.get(s)
-            if link:
-                st.markdown(f"- [{s}]({link})")
-            else:
-                st.markdown(f"- {s}")
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.markdown(f"**{s}**")
+            with col2:
+                if st.button("Open", key=s):
+                    webbrowser.open(link)
     else:
         st.info("No matching scholarships found for the entered details.")
