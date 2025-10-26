@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import joblib
 import os
+import streamlit.components.v1 as components
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OneHotEncoder, StandardScaler, MultiLabelBinarizer
 from sklearn.compose import ColumnTransformer
@@ -13,10 +14,11 @@ from sklearn.impute import SimpleImputer
 
 # === Streamlit App Title ===
 st.title("🎓 Scholarship Eligibility Prediction")
-st.write("Enter your details below to check which scholarships you are eligible for and directly visit their official websites.")
+st.write("Enter your details below to check which scholarships you are eligible for and directly open their official websites.")
 
-# === STEP 1: Load Dataset ===
+# === STEP 1: Load Dataset Automatically ===
 DATA_PATH = "Scholarship_dataset_final.csv"
+
 df = pd.read_csv(DATA_PATH)
 df["gate_score"] = pd.to_numeric(df["gate_score"], errors="coerce").fillna(0)
 
@@ -50,12 +52,12 @@ preprocessor = ColumnTransformer(
     ]
 )
 
-# === STEP 4: Model Training or Loading ===
+# === STEP 4: Model Loading or Training ===
 model_file = "scholarship_model.pkl"
 if os.path.exists(model_file):
     clf = joblib.load(model_file)
 else:
-    st.info("🚀 Training new model...")
+   
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     clf = Pipeline(steps=[
         ("preprocessor", preprocessor),
@@ -106,7 +108,7 @@ with st.form("scholarship_form"):
 
     submitted = st.form_submit_button("Predict Eligible Scholarships")
 
-# === STEP 7: Prediction ===
+# === STEP 7: Prediction & Direct Website Opening ===
 if submitted:
     sample = pd.DataFrame([{
         "age": age,
@@ -140,6 +142,13 @@ if submitted:
                 st.markdown(f"**{s}**")
             with col2:
                 if st.button("Open", key=s):
-                    webbrowser.open(link)
+                    components.html(
+                        f"""
+                        <script>
+                        window.open('{link}', '_blank').focus();
+                        </script>
+                        """,
+                        height=0,
+                    )
     else:
         st.info("No matching scholarships found for the entered details.")
