@@ -68,11 +68,11 @@ else:
 
 # === STEP 5: Scholarship Links Dictionary ===
 scholarship_links = {
-    "Post-Matric Scholarship (SC/ST/OBC)": "https://scholarships.gov.in",
-    "State Post-Matric Scholarship": "https://scholarships.gov.in",
-    "GATE-based MTech Fellowship": "https://aicte-india.org/schemes/students-development-schemes/PG-Scholarship",
-    "NTPC Scholarship": "https://www.ntpc.co.in/en/careers/scholarships",
-    "AICTE Pragati Scholarship": "https://aicte-india.org/schemes/students-development-schemes/Pragati-Scheme",
+    "Post-Matric Scholarship (SC/ST/OBC)": "https://postmatric-scholarship.cg.nic.in/LoginPage.aspx ",
+    "State Post-Matric Scholarship": "https://www.tntribalwelfare.tn.gov.in/scholarship_matric.php",
+    "GATE-based MTech Fellowship": "https://www.aicte.gov.in/schemes/students-development-schemes/PG-Scholarship-Scheme/General-instruction ",
+    "NTPC Scholarship":"https://www.theglobalscholarship.org/scholarship/ntpc-scholarship-?source=main ",
+    "AICTE Pragati Scholarship": "https://www.aicte.gov.in/schemes/students-development-schemes/Pragati/General-Instructions ",
     "Central Sector Scholarship": "https://scholarships.gov.in",
     "Siemens Scholarship Program": "https://www.siemens.co.in/en/scholarship",
     "Tata Trusts Scholarship": "https://www.tatatrusts.org/our-work/education/scholarships"
@@ -93,7 +93,7 @@ with st.form("scholarship_form"):
         "Top Private", "Private"
     ])
     program = st.selectbox("Program", ["UG", "PG"])
-    branch = st.text_input("Branch (e.g., Computer Science, Mechanical)")
+    branch = st.text_input("Branch (e.g., Computer Science, Mechanical)") 
     year = st.number_input("Year of Study", min_value=1, max_value=4 if program == "UG" else 2)
     final_year = 1 if (program == "UG" and year == 4) or (program == "PG" and year == 2) else 0
     tenth = st.number_input("10th Percentage", min_value=0.0, max_value=100.0)
