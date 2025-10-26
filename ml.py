@@ -56,7 +56,7 @@ model_file = "scholarship_model.pkl"
 
 if os.path.exists(model_file):
     clf = joblib.load(model_file)
-    st.success("✅ Existing model loaded successfully.")
+    
 else:
     st.info("🚀 Training new model...")
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
@@ -68,7 +68,7 @@ else:
     ])
     clf.fit(X_train, y_train)
     joblib.dump(clf, model_file)
-    st.success("✅ Model trained and saved successfully.")
+    
 
 # === STEP 5: User Input Form ===
 st.subheader("🧾 Enter Your Academic and Personal Details")
