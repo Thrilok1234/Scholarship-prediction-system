@@ -1,82 +1,131 @@
-
-
 import streamlit as st
 import pandas as pd
+import numpy as np
 import joblib
 import os
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import OneHotEncoder, StandardScaler, MultiLabelBinarizer
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.multioutput import MultiOutputClassifier
+from sklearn.impute import SimpleImputer
 
-st.set_page_config(
-    page_title="Scholarship Predictor",
-    page_icon="🎓",
-    layout="centered"
+# === Streamlit App Title ===
+st.title("🎓 Scholarship Eligibility Prediction")
+st.write("Enter your details below to check which scholarships you are eligible for.")
+
+# === STEP 1: Load Dataset Automatically ===
+DATA_PATH = r"C:\Users\Thrilok\Downloads\Scholarship_dataset_final.csv"
+
+df = pd.read_csv(DATA_PATH)
+df["gate_score"] = pd.to_numeric(df["gate_score"], errors="coerce").fillna(0)
+
+# === STEP 2: Prepare Features and Labels ===
+X = df.drop(columns=["id", "name", "eligible_scholarships"])
+y_labels = df["eligible_scholarships"].fillna("").apply(lambda x: x.split(";") if x else [])
+
+mlb = MultiLabelBinarizer()
+y = mlb.fit_transform(y_labels)
+joblib.dump(mlb, "label_binarizer.pkl")
+
+# === STEP 3: Pipelines for Preprocessing ===
+categorical = ["gender", "state", "category", "institution_type", "program", "branch"]
+numeric = ["age", "family_income_annual_inr", "disability", "year", "final_year",
+           "tenth_percent", "twelfth_percent", "ug_cgpa", "gate_score"]
+
+cat_pipeline = Pipeline(steps=[
+    ("imputer", SimpleImputer(strategy="most_frequent")),
+    ("encoder", OneHotEncoder(handle_unknown="ignore"))
+])
+
+num_pipeline = Pipeline(steps=[
+    ("imputer", SimpleImputer(strategy="mean")),
+    ("scaler", StandardScaler())
+])
+
+preprocessor = ColumnTransformer(
+    transformers=[
+        ("cat", cat_pipeline, categorical),
+        ("num", num_pipeline, numeric)
+    ]
 )
 
+# === STEP 4: Model Training or Loading ===
+model_file = "scholarship_model.pkl"
 
-st.title("🎓 Scholarship Predictor")
-st.write("Provide your details below to check eligible scholarships.")
-
-MODEL_PATH = "scholarship_model.pkl"
-LB_PATH = "label_binarizer.pkl"
-clf, mlb = None, None
-
-if os.path.exists(MODEL_PATH) and os.path.exists(LB_PATH):
-    clf = joblib.load(MODEL_PATH)
-    mlb = joblib.load(LB_PATH)
-    
+if os.path.exists(model_file):
+    clf = joblib.load(model_file)
+    st.success("✅ Existing model loaded successfully.")
 else:
-    st.warning(" Model or label binarizer not found. App cannot predict scholarships.")
+    st.info("🚀 Training new model...")
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    clf = Pipeline(steps=[
+        ("preprocessor", preprocessor),
+        ("classifier", MultiOutputClassifier(
+            RandomForestClassifier(n_estimators=200, random_state=42, n_jobs=-1)
+        ))
+    ])
+    clf.fit(X_train, y_train)
+    joblib.dump(clf, model_file)
+    st.success("✅ Model trained and saved successfully.")
 
-st.header("📋 Enter Your Details")
+# === STEP 5: User Input Form ===
+st.subheader("🧾 Enter Your Academic and Personal Details")
 
-age = st.number_input("Age", min_value=15, max_value=40, value=20)
-gender = st.selectbox("Gender", ["Male", "Female", "Other"])
-state = st.text_input("State", "Tamil Nadu")
-category = st.selectbox("Category", ["GEN", "OBC", "SC", "ST", "Minority"])
-income = st.number_input("Annual Family Income (INR)", min_value=0, value=300000, step=5000)
-disability = st.selectbox("Disability", [0, 1])
-institution = st.selectbox("Institution Type", [
-    "IIT", "NIT", "Central University", "State Government University", "Top Private", "Private"
-])
-program = st.selectbox("Program", ["UG", "PG"])
-branch = st.text_input("Branch", "Computer Science")
-year = st.number_input("Year of Study", min_value=1, max_value=4 if program=="UG" else 2, value=1)
-final_year = 1 if (program == "UG" and year == 4) or (program == "PG" and year == 2) else 0
-tenth = st.number_input("10th Percentage", min_value=0.0, max_value=100.0, value=80.0)
-twelfth = st.number_input("12th Percentage", min_value=0.0, max_value=100.0, value=80.0)
-cgpa = st.number_input("Current CGPA", min_value=0.0, max_value=10.0, value=8.0)
-gate_score = 0
-if program == "PG":
-    gate_score = st.number_input("GATE Score (if applicable)", min_value=0, value=0)
+with st.form("scholarship_form"):
+    age = st.number_input("Age", min_value=15, max_value=35, value=20)
+    gender = st.selectbox("Gender", ["Male", "Female", "Other"])
+    state = st.text_input("State")
+    category = st.selectbox("Category", ["GEN", "OBC", "SC", "ST", "Minority"])
+    income = st.number_input("Annual Family Income (INR)", min_value=0)
+    disability = st.selectbox("Disability", [0, 1])
+    institution = st.selectbox("Institution Type", [
+        "IIT", "NIT", "Central University", "State Government University",
+        "Top Private", "Private"
+    ])
+    program = st.selectbox("Program", ["UG", "PG"])
+    branch = st.text_input("Branch (e.g., Computer Science, Mechanical)")
+    year = st.number_input("Year of Study", min_value=1, max_value=4 if program == "UG" else 2)
+    final_year = 1 if (program == "UG" and year == 4) or (program == "PG" and year == 2) else 0
+    tenth = st.number_input("10th Percentage", min_value=0.0, max_value=100.0)
+    twelfth = st.number_input("12th Percentage", min_value=0.0, max_value=100.0)
+    cgpa = st.number_input("Current CGPA", min_value=0.0, max_value=10.0)
+    gate_score = 0
+    if program == "PG":
+        gate_input = st.text_input("GATE Score (optional)", value="0")
+        gate_score = int(gate_input) if gate_input.strip().isdigit() else 0
 
+    submitted = st.form_submit_button("Predict Eligible Scholarships")
 
-if st.button("🔍 Predict Scholarships"):
-    if clf and mlb:
-        sample = pd.DataFrame([{
-            "age": age,
-            "gender": gender,
-            "state": state,
-            "category": category,
-            "family_income_annual_inr": income,
-            "disability": disability,
-            "institution_type": institution,
-            "program": program,
-            "branch": branch,
-            "year": year,
-            "final_year": final_year,
-            "tenth_percent": tenth,
-            "twelfth_percent": twelfth,
-            "ug_cgpa": cgpa,
-            "gate_score": gate_score
-        }])
+# === STEP 6: Prediction ===
+if submitted:
+    sample = pd.DataFrame([{
+        "age": age,
+        "gender": gender,
+        "state": state,
+        "category": category,
+        "family_income_annual_inr": income,
+        "disability": disability,
+        "institution_type": institution,
+        "program": program,
+        "branch": branch,
+        "year": year,
+        "final_year": final_year,
+        "tenth_percent": tenth,
+        "twelfth_percent": twelfth,
+        "ug_cgpa": cgpa,
+        "gate_score": gate_score
+    }])
 
-        pred = clf.predict(sample)
-        pred_labels = mlb.inverse_transform(pred)
+    pred = clf.predict(sample)
+    mlb = joblib.load("label_binarizer.pkl")
+    pred_labels = mlb.inverse_transform(pred)
+    scholarships = pred_labels[0]
 
-        if pred_labels[0]:
-            st.success(" Eligible Scholarships for you:")
-            for s in pred_labels[0]:
-                st.write(f" {s}")
-        else:
-            st.warning(" No matching scholarships found.")
+    st.subheader("🎯 Eligible Scholarships:")
+    if scholarships:
+        for s in scholarships:
+            st.markdown(f"- {s}")
     else:
-        st.error("Model not loaded. Cannot perform prediction.")
+        st.info("No matching scholarships found for the entered details.")
