@@ -16,7 +16,7 @@ st.title("🎓 Scholarship Eligibility Prediction")
 st.write("Enter your details below to check which scholarships you are eligible for.")
 
 # === STEP 1: Load Dataset Automatically ===
-DATA_PATH = r"C:\Users\Thrilok\Downloads\Scholarship_dataset_final.csv"
+DATA_PATH = r"Scholarship_dataset_final.csv"
 
 df = pd.read_csv(DATA_PATH)
 df["gate_score"] = pd.to_numeric(df["gate_score"], errors="coerce").fillna(0)
