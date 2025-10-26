@@ -76,6 +76,7 @@ scholarship_links = {
     "Central Sector Scholarship": "https://scholarships.gov.in",
     "Siemens Scholarship Program": "https://www.siemens.co.in/en/scholarship",
     "Tata Trusts Scholarship": "https://www.tatatrusts.org/our-work/education/scholarships"
+    "institute merit scholarship (iit/nit)": "https://www.buddy4study.com/article/iit-nit-scholarships"
 }
 
 # === STEP 6: User Input Form ===
