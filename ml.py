@@ -75,8 +75,8 @@ scholarship_links = {
     "AICTE Pragati Scholarship": "https://www.aicte.gov.in/schemes/students-development-schemes/Pragati/General-Instructions ",
     "Central Sector Scholarship": "https://scholarships.gov.in",
     "Siemens Scholarship Program": "https://www.siemens.co.in/en/scholarship",
-    "Tata Trusts Scholarship": "https://www.tatatrusts.org/our-work/education/scholarships"
-    "institute merit scholarship (iit/nit)": "https://www.buddy4study.com/article/iit-nit-scholarships"
+    "Tata Trusts Scholarship": "https://www.tatatrusts.org/our-work/education/scholarships",
+    "institute merit scholarship (iit/nit)" : "https://www.buddy4study.com/article/iit-nit-scholarships"
 }
 
 # === STEP 6: User Input Form ===
