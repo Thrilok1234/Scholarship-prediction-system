@@ -4,27 +4,30 @@ import numpy as np
 import joblib
 import os
 import warnings
-warnings.filterwarnings('ignore')
-
-# --------------------------------------------------
-# IMPORT TRAINING FUNCTION
-# --------------------------------------------------
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.multioutput import MultiOutputClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, StandardScaler
-from sklearn.metrics import classification_report, hamming_loss, accuracy_score
+warnings.filterwarnings('ignore')
 
-# -----------------------------
+# --------------------------------------------------
+# PATH SETUP
+# --------------------------------------------------
+BASE_DIR = os.path.dirname(__file__)
+
+# --------------------------------------------------
 # MODEL TRAINING FUNCTION
-# -----------------------------
+# --------------------------------------------------
 def train_scholarship_model():
     st.info("🚀 Starting ML model training...")
+
+    dataset_path = os.path.join(BASE_DIR, 'scholarship_dataset_with_caste_10000.csv')
+
     try:
-        df = pd.read_csv(r'C:\Users\Thrilok\ml_env\Lib\site-packages\ml_project\scholarship_dataset_with_caste_10000.csv')
+        df = pd.read_csv(dataset_path)
         st.success("✅ Dataset loaded successfully!")
     except FileNotFoundError:
-        st.error("❌ Dataset not found! Please check the path.")
+        st.error(f"❌ Dataset not found at {dataset_path}")
         return
 
     feature_columns = ['course_level', 'category', 'gender', 'annual_income',
@@ -64,11 +67,11 @@ def train_scholarship_model():
     st.success("✅ Model training completed!")
 
     # Save model files
-    joblib.dump(model, 'scholarship_predictor_model.pkl')
-    joblib.dump(label_encoders, 'label_encoders.pkl')
-    joblib.dump(scaler, 'scaler.pkl')
-    joblib.dump(feature_columns, 'feature_columns.pkl')
-    joblib.dump(target_columns, 'target_columns.pkl')
+    joblib.dump(model, os.path.join(BASE_DIR, 'scholarship_predictor_model.pkl'))
+    joblib.dump(label_encoders, os.path.join(BASE_DIR, 'label_encoders.pkl'))
+    joblib.dump(scaler, os.path.join(BASE_DIR, 'scaler.pkl'))
+    joblib.dump(feature_columns, os.path.join(BASE_DIR, 'feature_columns.pkl'))
+    joblib.dump(target_columns, os.path.join(BASE_DIR, 'target_columns.pkl'))
     st.success("💾 Model and preprocessing objects saved successfully!")
 
 # --------------------------------------------------
@@ -76,11 +79,15 @@ def train_scholarship_model():
 # --------------------------------------------------
 class ScholarshipPredictor:
     def __init__(self):
-        self.model = joblib.load('scholarship_predictor_model.pkl')
-        self.label_encoders = joblib.load('label_encoders.pkl')
-        self.scaler = joblib.load('scaler.pkl')
-        self.feature_columns = joblib.load('feature_columns.pkl')
-        self.target_columns = joblib.load('target_columns.pkl')
+        try:
+            self.model = joblib.load(os.path.join(BASE_DIR, 'scholarship_predictor_model.pkl'))
+            self.label_encoders = joblib.load(os.path.join(BASE_DIR, 'label_encoders.pkl'))
+            self.scaler = joblib.load(os.path.join(BASE_DIR, 'scaler.pkl'))
+            self.feature_columns = joblib.load(os.path.join(BASE_DIR, 'feature_columns.pkl'))
+            self.target_columns = joblib.load(os.path.join(BASE_DIR, 'target_columns.pkl'))
+        except FileNotFoundError:
+            st.error("❌ Model files not found. Please train the model first.")
+            raise
 
         self.income_limits = {
             'UG1_CentralSector': 800000, 'UG2_Reliance': 1500000, 'UG3_PostMatric_SC_ST': 250000,
@@ -138,11 +145,16 @@ class ScholarshipPredictor:
 st.set_page_config(page_title="🎓 Scholarship Predictor", page_icon="🎓", layout="centered")
 st.title("🎓 Scholarship Predictor")
 
+option = st.sidebar.radio("Choose Option", ["Predict Scholarships", "Train Model"])
 
-option = st.sidebar.radio("", ["Predict Scholarships"])
+# ---------------- TRAIN MODEL SECTION ----------------
+if option == "Train Model":
+    st.header("⚙️ Train Scholarship Model")
+    if st.button("🚀 Start Training"):
+        train_scholarship_model()
 
-
-if option == "Predict Scholarships":
+# ---------------- PREDICTION SECTION ----------------
+elif option == "Predict Scholarships":
     st.header("📋 Enter Student Details")
 
     with st.form("input_form"):
@@ -186,6 +198,7 @@ if option == "Predict Scholarships":
                     st.write(f"🎯 **{r['Scholarship']}** — {r['Confidence']} Confidence ({r['Probability']})")
                     if r['Income Limit'] != 'No Limit':
                         st.caption(f"💰 Income Limit: {r['Income Limit']}")
+
             if ineligible:
                 st.warning("⚠️ Potentially Eligible (Income Too High):")
                 for r in ineligible:
