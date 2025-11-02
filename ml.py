@@ -1,144 +1,267 @@
-import streamlit as st
+
 import pandas as pd
 import numpy as np
-import joblib
-import os
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import OneHotEncoder, StandardScaler, MultiLabelBinarizer
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.multioutput import MultiOutputClassifier
-from sklearn.impute import SimpleImputer
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.metrics import classification_report, hamming_loss, accuracy_score
+import joblib
+import warnings
+warnings.filterwarnings('ignore')
 
-# === Streamlit App Title ===
-st.title("🎓 Scholarship Eligibility Prediction")
-st.write("Enter your details below to check which scholarships you are eligible for and directly visit their official websites.")
+def train_scholarship_model():
+    """Train ML model for scholarship prediction"""
+    print("🚀 STARTING ML MODEL TRAINING...")
+    print("="*60)
+    
+    # Load the dataset
+    try:
+        df = pd.read_csv(r'C:\Users\Thrilok\ml_env\Lib\site-packages\ml_project\scholarship_dataset_with_caste_10000.csv')
+        print("✅ Dataset loaded successfully!")
+        print(f"📊 Dataset shape: {df.shape}")
+    except FileNotFoundError:
+        print("❌ Dataset file not found! Please check the file path.")
+        return
+    
+    # Define features and targets
+    feature_columns = ['course_level', 'category', 'gender', 'annual_income', 
+                      'marks_10', 'marks_12', 'ug_cgpa', 'field_of_study', 
+                      'disability', 'university_tier']
 
-# === STEP 1: Load Dataset ===
-DATA_PATH = "Scholarship_dataset_final.csv"
-df = pd.read_csv(DATA_PATH)
-df["gate_score"] = pd.to_numeric(df["gate_score"], errors="coerce").fillna(0)
+    target_columns = ['UG1_CentralSector', 'UG2_Reliance', 'UG3_PostMatric_SC_ST', 
+                     'UG4_SwamiDayanand_Female', 'UG5_TopClass_SC', 'UG6_MeritMeans_OBC',
+                     'UG7_AdityaBirla', 'UG8_Cummins_SC_ST_Engg', 'UG9_SitaramJindal', 
+                     'UG10_Disability', 'PG1_AICTE_NSPS', 'PG2_ReliancePG', 
+                     'PG3_PostMatric_SC_ST_OBC', 'PG4_NationalFellowship_OBC', 
+                     'PG5_INSPIRE', 'PG6_ICSSR', 'PG7_CumminsPG_SC_ST', 'PG8_TataTrusts']
 
-# === STEP 2: Prepare Features and Labels ===
-X = df.drop(columns=["id", "name", "eligible_scholarships"])
-y_labels = df["eligible_scholarships"].fillna("").apply(lambda x: x.split(";") if x else [])
+    # Prepare the data
+    X = df[feature_columns].copy()
+    y = df[target_columns]
 
-mlb = MultiLabelBinarizer()
-y = mlb.fit_transform(y_labels)
-joblib.dump(mlb, "label_binarizer.pkl")
+    print(f"🎯 Features: {len(feature_columns)} columns")
+    print(f"🎯 Targets: {len(target_columns)} scholarships")
+    
+    # Handle missing values in ug_cgpa (for UG students)
+    X['ug_cgpa'] = X['ug_cgpa'].fillna(0)
 
-# === STEP 3: Preprocessing Pipelines ===
-categorical = ["gender", "state", "category", "institution_type", "program", "branch"]
-numeric = ["age", "family_income_annual_inr", "disability", "year", "final_year",
-           "tenth_percent", "twelfth_percent", "ug_cgpa", "gate_score"]
+    # Encode categorical variables
+    label_encoders = {}
+    categorical_columns = ['course_level', 'category', 'gender', 'field_of_study', 'disability', 'university_tier']
 
-cat_pipeline = Pipeline(steps=[
-    ("imputer", SimpleImputer(strategy="most_frequent")),
-    ("encoder", OneHotEncoder(handle_unknown="ignore"))
-])
+    print("\n🔧 Preprocessing data...")
+    for col in categorical_columns:
+        le = LabelEncoder()
+        X[col] = le.fit_transform(X[col])
+        label_encoders[col] = le
+        print(f"   Encoded: {col} → {len(le.classes_)} categories")
 
-num_pipeline = Pipeline(steps=[
-    ("imputer", SimpleImputer(strategy="mean")),
-    ("scaler", StandardScaler())
-])
+    # Scale numerical features
+    scaler = StandardScaler()
+    numerical_columns = ['annual_income', 'marks_10', 'marks_12', 'ug_cgpa']
+    X[numerical_columns] = scaler.fit_transform(X[numerical_columns])
+    print("   Scaled numerical features")
 
-preprocessor = ColumnTransformer(
-    transformers=[
-        ("cat", cat_pipeline, categorical),
-        ("num", num_pipeline, numeric)
+    # Split the data
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=df['course_level']
+    )
+
+    print(f"\n📈 Data split:")
+    print(f"   Training set: {X_train.shape}")
+    print(f"   Test set: {X_test.shape}")
+
+    # Train the model
+    print("\n🤖 Training Multi-output Random Forest Classifier...")
+    model = MultiOutputClassifier(
+        RandomForestClassifier(
+            n_estimators=100, 
+            random_state=42, 
+            n_jobs=-1,
+            max_depth=10,
+            min_samples_split=5
+        )
+    )
+    
+    model.fit(X_train, y_train)
+    print("✅ Model training completed!")
+
+    # Evaluate the model
+    print("\n📊 MODEL EVALUATION")
+    print("-" * 40)
+    
+    y_pred = model.predict(X_test)
+    
+    # Calculate metrics
+    h_loss = hamming_loss(y_test, y_pred)
+    
+    # Calculate accuracy for each scholarship
+    accuracies = []
+    for i, col in enumerate(target_columns):
+        acc = accuracy_score(y_test[col], y_pred[:, i])
+        accuracies.append(acc)
+    
+    avg_accuracy = np.mean(accuracies)
+    
+    print(f"🎯 Hamming Loss: {h_loss:.4f} (Lower is better)")
+    print(f"🎯 Average Accuracy: {avg_accuracy:.2%}")
+    print(f"🎯 Best Scholarship Accuracy: {max(accuracies):.2%}")
+    print(f"🎯 Worst Scholarship Accuracy: {min(accuracies):.2%}")
+
+    # Feature Importance
+    print("\n🔍 FEATURE IMPORTANCE (Top 5)")
+    print("-" * 40)
+    feature_importance = np.mean([est.feature_importances_ for est in model.estimators_], axis=0)
+    importance_df = pd.DataFrame({
+        'Feature': feature_columns,
+        'Importance': feature_importance
+    }).sort_values('Importance', ascending=False)
+    
+    for _, row in importance_df.head().iterrows():
+        print(f"   {row['Feature']}: {row['Importance']:.3f}")
+
+    # Save the model and preprocessing objects
+    print("\n💾 Saving model and preprocessing objects...")
+    joblib.dump(model, 'scholarship_predictor_model.pkl')
+    joblib.dump(label_encoders, 'label_encoders.pkl')
+    joblib.dump(scaler, 'scaler.pkl')
+    joblib.dump(feature_columns, 'feature_columns.pkl')
+    joblib.dump(target_columns, 'target_columns.pkl')
+    
+    print("✅ All files saved successfully!")
+    print("\n📁 Saved files:")
+    print("   - scholarship_predictor_model.pkl (Trained ML model)")
+    print("   - label_encoders.pkl (Categorical encoders)")
+    print("   - scaler.pkl (Feature scaler)")
+    print("   - feature_columns.pkl (Feature names)")
+    print("   - target_columns.pkl (Scholarship names)")
+
+    return model, label_encoders, scaler, feature_columns, target_columns
+
+def test_trained_model():
+    """Test the trained model with sample students"""
+    print("\n" + "="*60)
+    print("🧪 TESTING TRAINED MODEL")
+    print("="*60)
+    
+    try:
+        # Load saved objects
+        model = joblib.load('scholarship_predictor_model.pkl')
+        label_encoders = joblib.load('label_encoders.pkl')
+        scaler = joblib.load('scaler.pkl')
+        feature_columns = joblib.load('feature_columns.pkl')
+        target_columns = joblib.load('target_columns.pkl')
+        
+        print("✅ Model loaded successfully for testing!")
+    except FileNotFoundError:
+        print("❌ Model files not found. Please train the model first.")
+        return
+
+    def predict_scholarships_ml(student_data):
+        """Pure ML prediction function"""
+        # Create DataFrame from input
+        input_df = pd.DataFrame([student_data])
+        
+        # Handle UG students (no CGPA)
+        if student_data['course_level'] == 'UG':
+            input_df['ug_cgpa'] = 0
+        
+        # Encode categorical variables
+        categorical_columns = ['course_level', 'category', 'gender', 'field_of_study', 'disability', 'university_tier']
+        for col in categorical_columns:
+            if col in label_encoders:
+                if student_data[col] in label_encoders[col].classes_:
+                    input_df[col] = label_encoders[col].transform([student_data[col]])[0]
+                else:
+                    input_df[col] = -1
+        
+        # Scale numerical features
+        numerical_columns = ['annual_income', 'marks_10', 'marks_12', 'ug_cgpa']
+        input_df[numerical_columns] = scaler.transform(input_df[numerical_columns])
+        
+        # Ensure correct column order
+        input_df = input_df[feature_columns]
+        
+        # Pure ML Prediction
+        predictions = model.predict(input_df)[0]
+        probabilities = model.predict_proba(input_df)
+        
+        # Get results
+        eligible_scholarships = []
+        scholarship_details = []
+        
+        for i, (pred, target_col) in enumerate(zip(predictions, target_columns)):
+            if pred == 1:
+                prob = probabilities[i][0][1]
+                eligible_scholarships.append(target_col)
+                scholarship_details.append({
+                    'scholarship': target_col,
+                    'probability': f"{prob:.1%}",
+                    'confidence': 'High' if prob > 0.7 else 'Medium' if prob > 0.5 else 'Low'
+                })
+        
+        return eligible_scholarships, scholarship_details
+
+    # Test Cases
+    test_cases = [
+        {
+            'name': 'UG SC Student (Engineering, Low Income)',
+            'data': {
+                'course_level': 'UG', 'category': 'SC', 'gender': 'Male',
+                'annual_income': 200000, 'marks_10': 92, 'marks_12': 88,
+                'ug_cgpa': 0, 'field_of_study': 'Engineering',
+                'disability': 'No', 'university_tier': 'Tier 2'
+            }
+        },
+        {
+            'name': 'PG OBC Student (Engineering, Medium Income)',
+            'data': {
+                'course_level': 'PG', 'category': 'OBC', 'gender': 'Female',
+                'annual_income': 500000, 'marks_10': 85, 'marks_12': 82,
+                'ug_cgpa': 8.2, 'field_of_study': 'Engineering',
+                'disability': 'No', 'university_tier': 'Tier 1'
+            }
+        },
+        {
+            'name': 'UG GEN Student (High Merit, High Income)',
+            'data': {
+                'course_level': 'UG', 'category': 'GEN', 'gender': 'Female',
+                'annual_income': 1900000, 'marks_10': 98, 'marks_12': 97,
+                'ug_cgpa': 0, 'field_of_study': 'Engineering',
+                'disability': 'No', 'university_tier': 'Tier 1'
+            }
+        }
     ]
-)
 
-# === STEP 4: Model Training or Loading ===
-model_file = "scholarship_model.pkl"
-if os.path.exists(model_file):
-    clf = joblib.load(model_file)
-else:
-    st.info("🚀 Training new model...")
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    clf = Pipeline(steps=[
-        ("preprocessor", preprocessor),
-        ("classifier", MultiOutputClassifier(
-            RandomForestClassifier(n_estimators=200, random_state=42, n_jobs=-1)
-        ))
-    ])
-    clf.fit(X_train, y_train)
-    joblib.dump(clf, model_file)
+    for i, test_case in enumerate(test_cases, 1):
+        print(f"\n🎓 TEST CASE {i}: {test_case['name']}")
+        print("-" * 50)
+        
+        eligible, details = predict_scholarships_ml(test_case['data'])
+        
+        print(f"📊 ML Model predicts: {len(eligible)} scholarships")
+        for detail in details:
+            confidence_icon = "🟢" if detail['confidence'] == 'High' else "🟡" if detail['confidence'] == 'Medium' else "🔴"
+            print(f"   {confidence_icon} {detail['scholarship']}")
+            print(f"      Confidence: {detail['confidence']} ({detail['probability']})")
 
-# === STEP 5: Scholarship Links Dictionary ===
-scholarship_links = {
-    "Post-Matric Scholarship (SC/ST/OBC)": "https://postmatric-scholarship.cg.nic.in/LoginPage.aspx ",
-    "State Post-Matric Scholarship": "https://www.tntribalwelfare.tn.gov.in/scholarship_matric.php",
-    "GATE-based MTech Fellowship": "https://www.aicte.gov.in/schemes/students-development-schemes/PG-Scholarship-Scheme/General-instruction ",
-    "NTPC Scholarship":"https://www.theglobalscholarship.org/scholarship/ntpc-scholarship-?source=main ",
-    "AICTE Pragati Scholarship": "https://www.aicte.gov.in/schemes/students-development-schemes/Pragati/General-Instructions ",
-    "Central Sector Scholarship": "https://scholarships.gov.in",
-    "Siemens Scholarship Program": "https://www.siemens.co.in/en/scholarship",
-    "Tata Trusts Scholarship": "https://www.tatatrusts.org/our-work/education/scholarships",
-    "institute merit scholarship (iit/nit)" : "https://www.buddy4study.com/article/iit-nit-scholarships"
-}
-
-# === STEP 6: User Input Form ===
-st.subheader("🧾 Enter Your Academic and Personal Details")
-
-with st.form("scholarship_form"):
-    age = st.number_input("Age", min_value=15, max_value=35, value=20)
-    gender = st.selectbox("Gender", ["Male", "Female", "Other"])
-    state = st.text_input("State")
-    category = st.selectbox("Category", ["GEN", "OBC", "SC", "ST", "Minority"])
-    income = st.number_input("Annual Family Income (INR)", min_value=0)
-    disability = st.selectbox("Disability", [0, 1])
-    institution = st.selectbox("Institution Type", [
-        "IIT", "NIT", "Central University", "State Government University",
-        "Top Private", "Private"
-    ])
-    program = st.selectbox("Program", ["UG", "PG"])
-    branch = st.text_input("Branch (e.g., Computer Science, Mechanical)") 
-    year = st.number_input("Year of Study", min_value=1, max_value=4 if program == "UG" else 2)
-    final_year = 1 if (program == "UG" and year == 4) or (program == "PG" and year == 2) else 0
-    tenth = st.number_input("10th Percentage", min_value=0.0, max_value=100.0)
-    twelfth = st.number_input("12th Percentage", min_value=0.0, max_value=100.0)
-    cgpa = st.number_input("Current CGPA", min_value=0.0, max_value=10.0)
-    gate_score = 0
-    if program == "PG":
-        gate_input = st.text_input("GATE Score (optional)", value="0")
-        gate_score = int(gate_input) if gate_input.strip().isdigit() else 0
-
-    submitted = st.form_submit_button("Predict Eligible Scholarships")
-
-# === STEP 7: Prediction ===
-if submitted:
-    sample = pd.DataFrame([{
-        "age": age,
-        "gender": gender,
-        "state": state,
-        "category": category,
-        "family_income_annual_inr": income,
-        "disability": disability,
-        "institution_type": institution,
-        "program": program,
-        "branch": branch,
-        "year": year,
-        "final_year": final_year,
-        "tenth_percent": tenth,
-        "twelfth_percent": twelfth,
-        "ug_cgpa": cgpa,
-        "gate_score": gate_score
-    }])
-
-    pred = clf.predict(sample)
-    mlb = joblib.load("label_binarizer.pkl")
-    pred_labels = mlb.inverse_transform(pred)
-    scholarships = pred_labels[0]
-
-    st.subheader("🎯 Eligible Scholarships:")
-    if scholarships:
-        for s in scholarships:
-            link = scholarship_links.get(s)
-            if link:
-                st.markdown(f"- [{s}]({link})")
-            else:
-                st.markdown(f"- {s}")
-    else:
-        st.info("No matching scholarships found for the entered details.")
+# Main execution
+if __name__ == "__main__":
+    print("🎯 SCHOLARSHIP PREDICTION ML MODEL TRAINER")
+    print("="*60)
+    
+    # Train the model
+    trained_objects = train_scholarship_model()
+    
+    # Test the model
+    test_trained_model()
+    
+    print("\n" + "="*60)
+    print("🎉 TRAINING COMPLETED SUCCESSFULLY!")
+    print("="*60)
+    print("\n📚 NEXT STEPS:")
+    print("1. Use the saved model files for predictions")
+    print("2. Run the prediction script for new students")
+    print("3. The model uses PURE ML (Random Forest) - no rule-based logic!")
+    print("\n🚀 Your ML project is ready!")
